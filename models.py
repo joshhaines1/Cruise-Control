@@ -8,7 +8,7 @@ k = 40    # linear resistive coefficient [cite: 51]
 r0 = 25   # desired set speed (m/s) [cite: 51]
 
 # ==========================================
-# OPEN-LOOP CONTROL (No Feedback)
+# OPEN-LOOP CONTROL (No Feedback to Wind)
 # ==========================================
 # This system does not monitor v(t). It provides a fixed force u
 # based solely on the target r0, assuming no disturbances[cite: 60].
