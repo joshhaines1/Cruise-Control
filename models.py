@@ -13,7 +13,7 @@ def simulate_open_loop():
         disturbance = disturbance_force if t >= time_when_wind_starts else 0 
         return (-linear_resistance_coefficient * v + u_fixed - disturbance) / mass
     
-    sol = solve_ivp(dynamics, [0, 150], [initial_velocity], t_eval=np.linspace(0, 150, 1000))
+    sol = solve_ivp(dynamics, [0, 150], [initial_velocity], t_eval=np.linspace(0, 150, 1000), rtol=1e-8, atol=1e-8)
     return sol.t, sol.y[0]
 
 # These closed-loop systems monitor the actual velocity v(t) and calculate an error signal e(t) = r(t) - v(t) to adjust the force u.
@@ -40,34 +40,44 @@ def simulate_closed_loop(Kp, Ki, Kd):
 if __name__ == "__main__":
     # Plot graphs for all selected models
     plt.figure(figsize=(12, 7))
-
+    plot_title = "Cruise Control: "
+    loops = set()  
     # OPEN-LOOP (Exercise 4 scenario)
     if 'open_loop' in models_to_plot:
         t_ol, v_ol = simulate_open_loop()
         plt.plot(t_ol, v_ol, label='OPEN-LOOP: Fixed force (Fails at t=50)')
+        loops.add('Open-Loop')
 
     # CLOSED-LOOP P Control (Exercise 7: Proportional Only)
     if 'p' in models_to_plot:
         t_p, v_p = simulate_closed_loop(Kp=1360, Ki=0, Kd=0)
         plt.plot(t_p, v_p, label='P-Only (Biased/Steady-state error)')
+        loops.add('Closed-Loop')
 
     # CLOSED-LOOP: PI Control (Exercise 8/9: Integral to eliminate steady-state error)
     if 'pi' in models_to_plot:
-        t, v = simulate_closed_loop(Kp=1360, Ki=400, Kd=0)
+        t, v = simulate_closed_loop(Kp=1360, Ki=1400, Kd=0)
         plt.plot(t, v, label='PI Corrects speed bias')
+        loops.add('Closed-Loop')
 
     # CLOSED-LOOP: PID Control (Exercise 11/12: Full PID - Adds derivative for better response)
     if 'pid' in models_to_plot:
         t_pid, v_pid = simulate_closed_loop(Kp=1360, Ki=200, Kd=400)
         plt.plot(t_pid, v_pid, label='PID (Smooth & Accurate recovery)')
+        loops.add('Closed-Loop')
+
+    if len(loops) > 1:
+        plot_title += " & ".join(loops)
+    else:        
+        plot_title += loops.pop()
 
     plt.axvline(x=time_when_wind_starts, color='red', alpha=1, linestyle=':', label='Disturbance (Headwind) Starts')
-    plt.axhline(y=set_speed, color='green', linestyle=':', label='Desired Speed (Setpoint)')
-    plt.title("Cruise Control: Open-Loop vs. Closed-Loop Response")
+    plt.axhline(y=set_speed, color='green', linestyle=':', label='Desired Speed (Setpoint)') 
+    plt.title(plot_title)
     plt.xlabel("Time (s)")
     plt.ylabel("Velocity (mass/s)")
     plt.ylim(set_speed - 2, set_speed + 2) 
-    plt.xlim(time_when_wind_starts - 10, time_when_wind_starts + 10)
+    plt.xlim(time_when_wind_starts - 5, time_when_wind_starts + 15)
     plt.legend(loc='lower left')
     plt.grid(True)
     plt.show()
