@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
-from parameters import models_to_plot, mass, linear_resistance_coefficient, set_speed, initial_velocity, disturbance_force, time_when_wind_starts
+from parameters import models_to_plot, mass, wind_frequency, wind_type, linear_resistance_coefficient, set_speed, initial_velocity, disturbance_force, time_when_wind_starts
 
 # The open loop system does not monitor v(t). It provides a fixed force u based solely on the target set_speed, assuming no disturbances.
 def simulate_open_loop():
@@ -10,7 +10,11 @@ def simulate_open_loop():
     
     def dynamics(t, v):
         # The controller doesn't "see" this disturbance 
-        disturbance = disturbance_force if t >= time_when_wind_starts else 0 
+        if wind_type == 'constant':
+            disturbance = disturbance_force if t >= time_when_wind_starts else 0
+        elif wind_type == 'sinusoidal':
+           disturbance = disturbance_force * (1 + 0.5 * np.sin(wind_frequency * (t - time_when_wind_starts))) if t >= time_when_wind_starts else 0
+        
         return (-linear_resistance_coefficient * v + u_fixed - disturbance) / mass
     
     sol = solve_ivp(dynamics, [0, 150], [initial_velocity], t_eval=np.linspace(0, 150, 1000), rtol=1e-8, atol=1e-8)
@@ -23,15 +27,29 @@ def simulate_closed_loop(Kp, Ki, Kd):
     def pid_dynamics(t, y):
         v = y[0]
         itg_err = y[1]
-        
+
+        # Error
         error = set_speed - v
-        disturb = disturbance_force if t >= time_when_wind_starts else 0
-        
-        # Calculate acceleration (dv/dt) using the integrated mass formula
-        # This prevents the circular dependency of the D-term
-        dv_dt = (-linear_resistance_coefficient * v + Kp * error + Ki * itg_err - disturb) / (mass + Kd)
-        
-        # The derivative of the integral_error state is just the current error
+
+        # Disturbance
+        if wind_type == 'constant':
+            disturbance = disturbance_force if t >= time_when_wind_starts else 0
+        elif wind_type == 'sinusoidal':
+            disturbance = (
+                disturbance_force * (1 + 0.5 * np.sin(wind_frequency * (t - time_when_wind_starts)))
+                if t >= time_when_wind_starts else 0
+            )
+        else:
+            disturbance = 0
+
+        dv_dt_uncontrolled = (-linear_resistance_coefficient * v - disturbance) / mass
+
+        d_error_dt = -dv_dt_uncontrolled
+
+        u = Kp * error + Ki * itg_err + Kd * d_error_dt
+
+        dv_dt = (-linear_resistance_coefficient * v + u - disturbance) / mass
+
         return [dv_dt, error]
 
     sol = solve_ivp(pid_dynamics, [0, 150], y0, t_eval=np.linspace(0, 150, 1000), method='RK45')
@@ -56,13 +74,13 @@ if __name__ == "__main__":
 
     # CLOSED-LOOP: PI Control (Exercise 8/9: Integral to eliminate steady-state error)
     if 'pi' in models_to_plot:
-        t, v = simulate_closed_loop(Kp=1360, Ki=1400, Kd=0)
+        t, v = simulate_closed_loop(Kp=1360, Ki=400, Kd=0)
         plt.plot(t, v, label='PI Corrects speed bias')
         loops.add('Closed-Loop')
 
     # CLOSED-LOOP: PID Control (Exercise 11/12: Full PID - Adds derivative for better response)
     if 'pid' in models_to_plot:
-        t_pid, v_pid = simulate_closed_loop(Kp=1360, Ki=200, Kd=400)
+        t_pid, v_pid = simulate_closed_loop(Kp=1360, Ki=400, Kd=600)
         plt.plot(t_pid, v_pid, label='PID (Smooth & Accurate recovery)')
         loops.add('Closed-Loop')
 
