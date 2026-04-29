@@ -1,6 +1,7 @@
 models_to_plot = ['pi', 'p', 'pid', 'open_loop'] # Options are 'open_loop', 'p', 'pi', 'pid'
 mass = 2000  # mass in kg 
 linear_resistance_coefficient = 40    # linear resistive coefficient 
+quadratic_resistance_coefficient = 20 #quadratic coefficient
 set_speed = 25   # desired set speed (m/s)
 initial_velocity = set_speed   # initial velocity (m/s)
 disturbance_force = 1000  # headwind force (N) starting at t=50s
