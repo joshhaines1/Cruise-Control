@@ -7,6 +7,7 @@ from parameters import (
     wind_frequency,
     wind_type,
     linear_resistance_coefficient,
+    quadratic_resistance_coefficient, 
     set_speed,
     initial_velocity,
     disturbance_force,
@@ -14,10 +15,8 @@ from parameters import (
 )
 
 def disturbance(t, wind_type):
-    # No disturbance before the wind starts
     if t < time_when_wind_starts:
         return 0
-
     if wind_type == 'constant':
         return disturbance_force
     elif wind_type == 'sinusoidal':
@@ -25,18 +24,24 @@ def disturbance(t, wind_type):
     else:
         return 0
 
+# Helper to calculate total drag force
+def get_drag(v):
+    linear_drag = linear_resistance_coefficient * v
+    quadratic_drag = quadratic_resistance_coefficient * v * np.abs(v)
+    return linear_drag + quadratic_drag
+
 # OPEN-LOOP SYSTEM
 def simulate_open_loop():
-    # Force required to maintain set_speed on level ground with no wind
-    u_fixed = linear_resistance_coefficient * set_speed
+    # Force required to maintain set_speed: u = b*v + c*v^2
+    u_fixed = get_drag(set_speed)
 
     def dynamics(t, v):
         d_force = disturbance(t, wind_type)
-        return (-linear_resistance_coefficient * v + u_fixed - d_force) / mass
+        drag = get_drag(v)
+        return (-drag + u_fixed - d_force) / mass
 
-    sol = solve_ivp(dynamics,[0, 150],[initial_velocity], t_eval=np.linspace(0, 150, 1000), rtol=1e-8, atol=1e-8)
+    sol = solve_ivp(dynamics, [0, 150], [initial_velocity], t_eval=np.linspace(0, 150, 1000), rtol=1e-8, atol=1e-8)
     return sol.t, sol.y[0]
-
 
 # CLOSED-LOOP SYSTEM (PID)
 def simulate_closed_loop(Kp, Ki, Kd):
@@ -45,24 +50,20 @@ def simulate_closed_loop(Kp, Ki, Kd):
     def pid_dynamics(t, y):
         v = y[0]
         itg_err = y[1]
-
-        # Error
         error = set_speed - v
-
-        # Disturbance
         d_force = disturbance(t, wind_type)
 
         # Uncontrolled dynamics (used for derivative term)
-        dv_dt_uncontrolled = (-linear_resistance_coefficient * v - d_force) / mass
-
-        # Derivative of error
+        # We include the quadratic drag here for a more accurate D-term
+        drag = get_drag(v)
+        dv_dt_uncontrolled = (-drag - d_force) / mass
         d_error_dt = -dv_dt_uncontrolled
 
         # PID control input
         u = Kp * error + Ki * itg_err + Kd * d_error_dt
 
         # Final system dynamics
-        dv_dt = (-linear_resistance_coefficient * v + u - d_force) / mass
+        dv_dt = (-drag + u - d_force) / mass
 
         return [dv_dt, error]
 
