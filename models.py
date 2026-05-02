@@ -14,6 +14,7 @@ from parameters import (
     time_when_wind_starts
 )
 
+BASE_SEED = np.random.randint(0, 1000000)
 def disturbance(t, wind_type):
     if t < time_when_wind_starts:
         return 0
@@ -21,6 +22,14 @@ def disturbance(t, wind_type):
         return disturbance_force
     elif wind_type == 'sinusoidal':
         return disturbance_force * (1 + 0.5 * np.sin(wind_frequency * (t - time_when_wind_starts)))
+    elif wind_type == 'random':
+        # Every value of t from 10.0 to 19.99 will result in the same seed (1)
+        interval_seed = int(t // 10) + BASE_SEED
+        np.random.seed(interval_seed)
+        
+        # Generates a multiplier between 0.5 and 1.5 of the base disturbance force
+        variation = np.random.uniform(-0.5, 0.5) 
+        return disturbance_force * (1 + variation)
     else:
         return 0
 
