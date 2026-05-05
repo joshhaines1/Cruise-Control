@@ -11,32 +11,35 @@ from parameters import (
     set_speed,
     initial_velocity,
     disturbance_force,
-    time_when_wind_starts
+    time_when_wind_starts,
+    time_when_wind_ends,
 )
 
 BASE_SEED = np.random.randint(0, 1000000)
 def disturbance(t, wind_type):
-    if t < time_when_wind_starts:
+    if t < time_when_wind_starts or t > time_when_wind_ends:
         return 0
     if wind_type == 'constant':
         return disturbance_force
     elif wind_type == 'sinusoidal':
         return disturbance_force * (1 + 0.5 * np.sin(wind_frequency * (t - time_when_wind_starts)))
     elif wind_type == 'random':
-        # Every value of t from 10.0 to 19.99 will result in the same seed (1)
+        # Keeps the 10-second interval logic
         interval_seed = int(t // 10) + BASE_SEED
         np.random.seed(interval_seed)
         
-        # Generates a multiplier between 0.5 and 1.5 of the base disturbance force
-        variation = np.random.uniform(-0.5, 0.5) 
-        return disturbance_force * (1 + variation)
+        # 2. Generate the magnitude variation (0.5 to 1.5)
+        magnitude = np.random.uniform(0.5, 1.5)
+        
+        # Result: Sometimes +1.2 * force, sometimes -0.8 * force
+        return disturbance_force * magnitude
     else:
         return 0
 
 # Helper to calculate total drag force
 def get_drag(v):
     linear_drag = linear_resistance_coefficient * v
-    quadratic_drag = quadratic_resistance_coefficient * v * np.abs(v)
+    quadratic_drag = quadratic_resistance_coefficient * v * v
     return linear_drag + quadratic_drag
 
 # OPEN-LOOP SYSTEM
@@ -94,19 +97,19 @@ if __name__ == "__main__":
     # P-ONLY
     if 'p' in models_to_plot:
         t_p, v_p = simulate_closed_loop(Kp=1360, Ki=0, Kd=0)
-        plt.plot(t_p, v_p, label='P-Only (Steady-state error)')
+        plt.plot(t_p, v_p, label='P-Only (Steady-state error)', color='blue')
         loops.add('Closed-Loop')
 
     # PI
     if 'pi' in models_to_plot:
         t_pi, v_pi = simulate_closed_loop(Kp=1360, Ki=400, Kd=0)
-        plt.plot(t_pi, v_pi, label='PI (Corrects steady-state error)')
+        plt.plot(t_pi, v_pi, label='PI (Corrects steady-state error)', color='orange')
         loops.add('Closed-Loop')
 
     # PID
     if 'pid' in models_to_plot:
         t_pid, v_pid = simulate_closed_loop(Kp=1360, Ki=400, Kd=600)
-        plt.plot(t_pid, v_pid, label='PID (Smooth & accurate recovery)')
+        plt.plot(t_pid, v_pid, label='PID (Smooth & accurate recovery)', color='green')
         loops.add('Closed-Loop')
 
     if len(loops) > 1:
@@ -132,7 +135,7 @@ if __name__ == "__main__":
     plt.xlabel("Time (s)")
     plt.ylabel("Velocity (m/s)")
     plt.ylim(set_speed - 2, set_speed + 2)
-    plt.xlim(time_when_wind_starts - 5, time_when_wind_starts + 15)
+    plt.xlim(time_when_wind_starts - 5, time_when_wind_starts + 10)
     plt.legend(loc='lower left')
     plt.grid(True)
     plt.show()
